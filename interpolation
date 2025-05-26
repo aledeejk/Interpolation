@@ -1,0 +1,44 @@
+module Interpolation
+  # Реализация интерполяции полиномом Лагранжа
+  class Lagrange
+    def initialize(points)
+      validate_points(points)
+      @points = points
+    end
+
+    # Вычислить многочлен Лагранжа в точке x
+    def evaluate(x)
+      result = 0.0
+      n = @points.size
+      n.times do |i|
+        xi, yi = @points[i]
+        term = yi.to_f
+        n.times do |j|
+          next if j == i
+          xj, _ = @points[j]
+          denominator = (xi.to_f - xj.to_f)
+          raise ZeroDivisionError, "Duplicate x values detected" if denominator == 0
+          term *= (x - xj.to_f) / denominator
+        end
+        result += term
+      end
+      result
+    end
+
+    private
+
+    def validate_points(points)
+      raise ArgumentError, "At least two points are required" if points.size < 2
+      points.each do |p|
+        unless p.is_a?(Array) && p.size == 2 &&
+               p[0].is_a?(Numeric) && p[1].is_a?(Numeric)
+          raise ArgumentError, "Each point must be an array [x, y] of two numeric values"
+        end
+      end
+      xs = points.map(&:first)
+      if xs.uniq.size != xs.size
+        raise ArgumentError, "x coordinates must be unique for interpolation"
+      end
+    end
+  end
+end
