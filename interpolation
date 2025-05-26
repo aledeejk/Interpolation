@@ -41,4 +41,102 @@ module Interpolation
       end
     end
   end
+
+  class CubicSpline
+    def initialize(points)
+      validate_points(points)
+      @points = points.sort_by { |p| p[0].to_f }
+      @n = @points.size
+      @h = []        # интервалы между x
+      @a = []        # значения y
+      @b = []        # коэффициенты сплайна
+      @c = []        # коэффициенты сплайна
+      @d = []        # коэффициенты сплайна
+      compute_coefficients
+    end
+
+    # Вычисляем сплайн при заданном значении x
+    def evaluate(x)
+      # находим интервал между сплайнами
+      return @a[0] if x <= @points[0][0]
+      return @a[@n-1] if x >= @points[@n-1][0]
+
+      i = find_segment(x)
+      dx = x - @points[i][0]
+      @a[i] + @b[i]*dx + @c[i]*dx*dx + @d[i]*dx*dx*dx
+    end
+
+    private
+
+    def validate_points(points)
+      raise ArgumentError, "At least two points are required" if points.size < 2
+      points.each do |p|
+        unless p.is_a?(Array) && p.size == 2 &&
+               p[0].is_a?(Numeric) && p[1].is_a?(Numeric)
+          raise ArgumentError, "Each point must be an array [x, y] of two numeric values"
+        end
+      end
+      xs = points.map(&:first)
+      if xs.uniq.size != xs.size
+        raise ArgumentError, "x coordinates must be unique for spline interpolation"
+      end
+    end
+
+    # Вычисляем коэффициенты сплайна для натурального кубического сплайна
+    def compute_coefficients
+      @n = @points.size
+      @a = @points.map { |p| p[1].to_f }
+      @h = []
+      (@n - 1).times { |i| @h << @points[i+1][0].to_f - @points[i][0].to_f }
+
+      # Решаем трехдиагональную систему для c
+      alpha = [0]
+      (1...@n-1).each do |i|
+        alpha << (3.0 / @h[i]) * (@a[i+1] - @a[i]) - (3.0 / @h[i-1]) * (@a[i] - @a[i-1])
+      end
+
+      l = [1.0]
+      mu = [0.0]
+      z = [0.0]
+
+      (1...@n-1).each do |i|
+        l_i = 2.0 * (@points[i+1][0].to_f - @points[i-1][0].to_f) - @h[i-1] * mu[i-1]
+        l << l_i
+        mu_i = @h[i] / l[i]
+        mu << mu_i
+        z_i = (alpha[i] - @h[i-1]*z[i-1]) / l[i]
+        z << z_i
+      end
+
+      l << 1.0
+      z << 0.0
+      @c = Array.new(@n, 0.0)
+      @b = Array.new(@n - 1, 0.0)
+      @d = Array.new(@n - 1, 0.0)
+
+      ( @n - 2 ).downto(0) do |j|
+        @c[j] = z[j] - mu[j] * @c[j+1]
+        @b[j] = (@a[j+1] - @a[j]) / @h[j] - @h[j] * (@c[j+1] + 2*@c[j]) / 3.0
+        @d[j] = (@c[j+1] - @c[j]) / (3.0 * @h[j])
+      end
+    end
+
+    # Находим индекс сегмента таким образом, чтобы точки[i].x <= x < точки[i+1].x
+    def find_segment(x)
+      # Бинарный поиск для повышения производительности в больших наборах данных
+      low = 0
+      high = @n - 2
+      while low <= high
+        mid = (low + high) / 2
+        if @points[mid][0] <= x && x < @points[mid+1][0]
+          return mid
+        elsif x < @points[mid][0]
+          high = mid - 1
+        else
+          low = mid + 1
+        end
+      end
+      @n - 2
+    end
+  end
 end
