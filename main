@@ -1,0 +1,78 @@
+require_relative 'interpolation'
+
+def main
+  puts "Демонстрация методов интерполяции"
+  puts "---------------------------------"
+
+  # Исходные данные для интерполяции
+  points = [
+    [1.0, 2.0],
+    [2.0, 3.1],
+    [3.0, 5.2],
+    [4.0, 4.3],
+    [5.0, 6.0],
+    [6.0, 7.7]
+  ]
+
+  # Создаем интерполяторы
+  lagrange = Interpolation::Lagrange.new(points)
+  spline = Interpolation::CubicSpline.new(points)
+
+  # Точка для интерполяции
+  x = 3.5
+
+  # Вычисляем значения
+  y_lagrange = lagrange.evaluate(x)
+  y_spline = spline.evaluate(x)
+
+  # Выводим результаты
+  puts "Исходные точки:"
+  points.each { |p| puts "  x = #{p[0]}, y = #{p[1]}" }
+  puts "\nРезультаты интерполяции в точке x = #{x}:"
+  puts "  Метод Лагранжа: y = #{y_lagrange.round(4)}"
+  puts "  Кубический сплайн: y = #{y_spline.round(4)}"
+
+  # Сравнение в нескольких точках
+  puts "\nСравнение методов в различных точках:"
+  puts "|   x   | Лагранж | Сплайн  |"
+  puts "|-------|---------|---------|"
+  [1.5, 2.8, 3.5, 4.2, 5.7].each do |x|
+    y_l = lagrange.evaluate(x).round(4)
+    y_s = spline.evaluate(x).round(4)
+    puts "| #{x.to_s.ljust(5)} | #{y_l.to_s.ljust(7)} | #{y_s.to_s.ljust(7)} |"
+  end
+
+  # Генерация данных для построения графиков (CSV)
+  generate_plot_data(points, lagrange, spline)
+end
+
+def generate_plot_data(points, lagrange, spline)
+  require 'csv'
+  
+  # Генерируем точки между минимальным и максимальным x
+  x_min = points.first[0]
+  x_max = points.last[0]
+  step = (x_max - x_min) / 100.0
+
+  CSV.open("interpolation_data.csv", "wb") do |csv|
+    csv << ["x", "Исходные", "Лагранж", "Сплайн"]
+    
+    # Исходные точки
+    points.each do |x, y|
+      csv << [x, y, lagrange.evaluate(x), spline.evaluate(x)]
+    end
+
+    # Дополнительные точки для гладкого графика
+    (0..100).each do |i|
+      x = x_min + i * step
+      unless points.any? { |p| p[0] == x } # Пропускаем исходные точки
+        csv << [x, nil, lagrange.evaluate(x), spline.evaluate(x)]
+      end
+    end
+  end
+
+  puts "\nДанные для построения графиков сохранены в interpolation_data.csv"
+  puts "Можно импортировать в Excel или другой инструмент для визуализации"
+end
+
+main if __FILE__ == $0
